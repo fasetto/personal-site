@@ -5,9 +5,20 @@ class Document extends NextDocument {
     render() {
         return (
             <Html>
-                <Head />
+                <Head>
+                    <link
+                        rel="preload"
+                        href="/fonts/inter-var-latin.woff2"
+                        as="font"
+                        type="font/woff2"
+                        crossOrigin="anonymous"
+                    />
+                    <link rel="icon" href="/favicon.ico" />
+                    <meta content="#ffffff" name="theme-color" />
+                    <meta content="#ffffff" name="msapplication-TileColor" />
+                </Head>
 
-                <body className="font-sans">
+                <body className="transition duration-300 bg-white text-black dark:text-white dark:bg-black font-sans">
                     <Main />
                     <NextScript />
                 </body>
