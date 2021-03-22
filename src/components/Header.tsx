@@ -13,7 +13,11 @@ export default function Header() {
     const toggleTheme = () => setTheme(theme == "light" ? "dark" : "light");
 
     return (
-        <div className="header sticky z-sticky top-0 bg-white dark:bg-black bg-opacity-60 dark:bg-opacity-70 md:my-4 p-8">
+        <div className={tw`
+            header sticky z-sticky top-0 p-8 md:my-4
+            bg-white dark:bg-black bg-opacity-60 dark:bg-opacity-70
+            transition-colors duration-300
+        `}>
             <div className="flex mx-auto justify-between items-center max-w-4xl">
                 <button
                     aria-label="Toggle dark mode"
