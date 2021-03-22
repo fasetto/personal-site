@@ -41,7 +41,8 @@ module.exports = {
         },
         extend: {
             boxShadow: {
-                "bottom-inset": "inset 0 -1px 0 rgba(0,0,0,.10)",
+                "bottom-inset-dark": "inset 0 -1px 0 #333",
+                "bottom-inset-light": "inset 0 -1px 0 #eaeaea",
             },
             opacity: {
                 "4": ".04",
@@ -55,16 +56,9 @@ module.exports = {
             }
         },
     },
-    variants: {
-        extend: {
-            backgroundOpacity: ["active"],
-            backgroundColor: ["active"],
-            textColor: ["active"],
-            ringWidth: ["focus-visible"],
-            ringColor: ["focus-visible"],
-            ringOffsetWidth: ["focus-visible"],
-            ringOpacity: ["focus-visible"],
-        },
-    },
-    plugins: [],
+    plugins: [
+        require("@tailwindcss/typography"),
+        require("@tailwindcss/forms"),
+        require("@tailwindcss/line-clamp"),
+    ],
 }
