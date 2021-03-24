@@ -1,0 +1,199 @@
+---
+title:  "Repository pattern ve tipik hatalar"
+image: "https://fasetto.github.io/assets/images/repository-pattern.png"
+author: "fasetto"
+publishedAt: "2017-04-23"
+categories: [design-patterns, .net, repository-pattern, unit-of-work]
+archived: true
+---
+
+![repository-pattern.png](https://fasetto.github.io/assets/images/repository-pattern.png)
+<br/>
+Repository pattern bir soyutlamadır. Amaç karışıklığı azaltarak kodun geri kalanını kalıcı kılmaktır.
+
+## Faydaları !
+  - Unit testler yazmayı kolaylaştırır.
+  - Kodun bakım ve yönetimi kolaylaşır.
+  - **CRUD** *(Create, Read, Update, Delete)* işlemlerimizi hızlıca gerçekleştirebiliriz.
+
+## Nasıl repository oluşturulur ?
+Repository pattern 'ı doğru bir şekilde uygulayabilmek için izlemeniz gereken tek bir kural var.
+> Repository sınıfınıza, ihtiyaç duyana kadar **hiç bir şey eklemeyin !**
+
+Geliştiricilerin bir çoğu generic bir repository oluturup, içine ihtiyaç duyabilecekleri tüm fonksiyonları da ekleyerek bunu bir base class olarak kullanırlar. **Bu yanlıştır.**
+
+## Unit of Work
+**Unit of work** design pattern 'ı genellikle **repository pattern** ile birlikte kullanılır.
+Adından da anlaşılacağı gibi veritabanı işlemlerimizi tek bir kanaldan yürütmemizi sağlar.
+<br/> <br/>
+Yapılan işlemlerin veritabanına toplu halde kaydedilmesi, herhangi bir hata olması durumunda *rollback* (geri alınması) ya da transaction iptali gibi işlemleri sağlayabiliriz.
+
+```cs
+public interface IUnitOfWork : IDisposable
+{
+    ITruckRepository Trucks { get; }
+    void Commit();
+}
+```
+
+## Uygulama
+Küçük bir örnek ile başlayalım.
+```cs
+public interface IRepository<TEntity, in TKey> where TEntity : class
+{
+    TEntity GetById(TKey id);
+    void Create(TEntity entity);
+    void Update(TEntity entity);
+    void Delete(TEntity entity);
+}```
+
+<br/>
+Biraz da özelleştirelim.
+```cs
+public interface ITruckRepository : IRepository<Truck, string>
+{
+    IEnumerable<Truck> FindBrokenTrucks();
+    IEnumerable<Truck> Find(string text);
+}
+```
+
+Burada görüldüğü gibi sadece ihtiyacınız olan fonksiyonları oluşturun.
+<br/>
+
+## Entity Framework
+### Base class (taban sınıf)
+```cs
+public class EntityFrameworkRepository<TEntity, TKey> : IRepository<TEntity, TKey>
+    where TEntity : class
+{
+    private readonly DbContext _dbContext;
+
+    public EntityFrameworkRepository(DbContext dbContext)
+    {
+        _dbContext = dbContext ?? throw new ArgumentNullException("dbContext");
+    }
+
+    protected DbContext DbContext => _dbContext;
+
+    public void Create(TEntity entity)
+    {
+        if (entity == null) throw new ArgumentNullException("entity");
+        DbContext.Set<TEntity>().Add(entity);
+    }
+
+    public TEntity GetById(TKey id)
+    {
+        return _dbContext.Set<TEntity>().Find(id);
+    }
+
+    public void Delete(TEntity entity)
+    {
+        if (entity == null) throw new ArgumentNullException("entity");
+
+        DbContext.Set<TEntity>().Attach(entity);
+        DbContext.Set<TEntity>().Remove(entity);
+    }
+
+    public void Update(TEntity entity)
+    {
+        if (entity == null) throw new ArgumentNullException("entity");
+
+        DbContext.Set<TEntity>().Attach(entity);
+        DbContext.Entry(entity).State = EntityState.Modified;
+    }
+}
+```
+
+ <br/>
+Oluşturduğumuz taban sınıfımızı daha sonra repository sınıfımıza implement ediyoruz.
+```cs
+{
+    private readonly TruckerDbContext _dbContext;
+
+    public TruckRepository(TruckerDbContext dbContext) :
+        base(dbContext)
+    {
+        _dbContext = dbContext;
+    }
+    public IEnumerable<Truck> FindBrokenTrucks()
+    {
+        return _dbContext.Trucks.Where(x => x.State == TruckState.Broken).ToList();
+    }
+    public IEnumerable<Truck> Find(string text)
+    {
+        return _dbContext.Trucks.Where(x => x.ModelName.StartsWith(text)).ToList();
+    }
+}
+```
+
+*return* ederken `ToList()`, `FirstOrDefault()` vb. çağrılıncaya kadar sorgu veritabanında *yürütülemez.*
+<br/>
+**Kullanmayı unutmayın !**
+
+<br/>
+### Entity Framework için Unit of Work
+```cs
+public class EntityFrameworkUnitOfWork : IUnitOfWork
+{
+    private readonly TruckerDbContext _dbContext;
+
+    public EntityFrameworkUnitOfWork(TruckerDbContext dbContext)
+    {
+        _dbContext = dbContext;
+
+        Trucks = new TruckRepository(dbContext);
+    }
+
+    public ITruckRepository Trucks { get; private set; }
+
+    public void Dispose()
+    {
+        _dbContext.Dispose();
+    }
+    public void Commit()
+    {
+        _dbContext.SaveChanges();
+    }
+}
+```
+
+<br/>
+### Final
+```cs
+using(var unitOfWork = new EntityFrameworkUnitOfWork(new TruckerDbContext()))
+{
+    // Arrange
+    unitOfWork.Trucks.Create(new Truck() { State = TruckState.Broken });
+    unitOfWork.Commit();
+
+    // Act
+    var brokenTrucks = unitOfWork.Trucks.FindBrokenTrucks();
+
+    // Assert
+    Assert.AreEqual(1, brokenTrucks.Count());
+}
+```
+
+# Tipik hatalar
+## Linq methodlarınızı dışarı açmayın
+Eğer linq methodlarınızı açığa vurursanız yani dışarıya açarsanız *(sızıntı)* repository pattern 'ı amacına uygun kullanamamış olursunuz. *Sızıntılı* bir soyutlama elde edersiniz.
+Genellikle `IQueryable<T>` ile.
+<br/>
+Repository pattern yazının en başında da dediğimiz gibi **soyutlamaya (abstraction)** dayanır.
+
+Bunu yapmayın:
+```cs
+public interface IRepository<TEntity>
+{
+    IQueryable<TEntity> Query();
+
+    // [...]
+}
+```
+
+> Bu repository sınıfları hiç bir amaca hizmet etmiyor.
+
+## Lazy-loading öğrenin
+Eğer bilmiyorsanız [Google](https://www.google.com/search?q=lazy+loading)
+<br/>
+<br/>
