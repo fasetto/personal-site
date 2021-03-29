@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@tailwindcss/forms": "^0.2.1",
+    "@tailwindcss/forms": "^0.3.2",
     "@tailwindcss/line-clamp": "^0.2.0",
     "@tailwindcss/typography": "^0.4.0",
     "focus-visible": "^5.2.0",
